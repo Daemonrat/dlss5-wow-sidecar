@@ -84,7 +84,7 @@ ProbeResult ProbeGpu() {
   if (!gpu) {
     r.state = ProbeState::Fail;
     r.detail = Tr("No NVIDIA adapter found.");
-    r.remedy = Tr("This sidecar needs an NVIDIA RTX 40 or RTX 50 card.");
+    r.remedy = Tr("This sidecar needs an NVIDIA RTX 20, 30, 40 or 50 card.");
     return r;
   }
 
@@ -94,13 +94,20 @@ ProbeResult ProbeGpu() {
   r.detail += " - ";
   r.detail += ToString(gpu->arch);
 
-  if (gpu->arch == GpuArch::Ada || gpu->arch == GpuArch::Blackwell) {
+  if (CanRunSidecar(*gpu)) {
+    if (IsExperimentalGpu(gpu->arch)) {
+      r.state = ProbeState::Warn;
+      r.remedy = Tr("RTX 20/30 support is experimental. Supply nvngx_dlssnr.dll "
+                   "with CUDA kernels for this GPU; otherwise the neural pass "
+                   "falls back to passthrough.");
+      return r;
+    }
     r.state = ProbeState::Ok;
     return r;
   }
   r.state = ProbeState::Fail;
-  r.remedy = Tr("RTX 40 (Ada) or RTX 50 (Blackwell) is required. Older cards are "
-             "refused rather than run badly.");
+  r.remedy = Tr("An NVIDIA RTX 20, 30, 40 or 50 card is required. "
+                "RTX 20/30 support is experimental.");
   return r;
 }
 
@@ -112,7 +119,7 @@ ProbeResult ProbeDriver() {
   if (!gpu) {
     r.state = ProbeState::Fail;
     r.detail = Tr("No NVIDIA adapter to query.");
-    r.remedy = Tr("Install an NVIDIA RTX 40 or RTX 50 card.");
+    r.remedy = Tr("Install an NVIDIA RTX 20, 30, 40 or 50 card.");
     return r;
   }
 

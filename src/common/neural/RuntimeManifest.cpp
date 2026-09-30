@@ -79,14 +79,16 @@ RuntimeVariant VariantForArchitecture(GpuArch arch) {
   switch (arch) {
     case GpuArch::Blackwell: return RuntimeVariant::Stock;
     case GpuArch::Ada:       return RuntimeVariant::AdaPatched;
-    // Turing and Ampere are refused by the spec's GPU matrix, so there is no
-    // runtime to ask for rather than a runtime we happen not to have.
+    // Experimental architectures have no verified runtime digest yet.
     default:                 return RuntimeVariant::None;
   }
 }
 
 RuntimeCompatibility CheckRuntimeCompatibility(GpuArch arch, RuntimeVariant variant) {
-  if (arch != GpuArch::Ada && arch != GpuArch::Blackwell) {
+  if (IsExperimentalGpu(arch)) {
+    return RuntimeCompatibility::UnverifiedArchitecture;
+  }
+  if (!IsSupportedGpu(arch)) {
     return RuntimeCompatibility::UnsupportedArchitecture;
   }
   switch (variant) {
@@ -106,6 +108,10 @@ std::string DescribeCompatibility(GpuArch arch, RuntimeVariant variant) {
   switch (CheckRuntimeCompatibility(arch, variant)) {
     case RuntimeCompatibility::Ok:
       return {};
+    case RuntimeCompatibility::UnverifiedArchitecture:
+      return std::string(Tr("Neural rendering is experimental on ")) + ToString(arch) +
+             Tr(". This runtime has not been verified for this GPU. Supply a build "
+                "with matching CUDA kernels; the driver may reject it.");
     case RuntimeCompatibility::UnsupportedArchitecture:
       return std::string(Tr("This GPU (")) + ToString(arch) +
              Tr(") is outside the supported matrix; neural rendering needs Ada or "

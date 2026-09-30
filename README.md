@@ -4,6 +4,11 @@
 
 # DLSS 5 Sidecar for World of Warcraft
 
+> **RTX 20/30 experimental fork:** Turing and Ampere can start the sidecar and
+> attempt neural rendering. Supply a `nvngx_dlssnr.dll` with CUDA kernels for
+> your card. The upstream Ada-patched bundle does not add that support by itself.
+> See [RTX 20/30 setup](docs/rtx20-30.md). Hardware validation is pending.
+
 Runs NVIDIA's DLSS 5 Neural Rendering over a live World of Warcraft frame —
 **without loading a single byte of code into `Wow.exe`**.
 
@@ -90,7 +95,7 @@ for.
 
 | | |
 |---|---|
-| **GPU** | NVIDIA RTX 40 (Ada) or RTX 50 (Blackwell). Nothing else is supported, and the manager will say so. |
+| **GPU** | NVIDIA RTX 20 (Turing), RTX 30 (Ampere), RTX 40 (Ada) or RTX 50 (Blackwell). RTX 20/30 support is experimental and requires a matching neural runtime. GTX cards are refused. |
 | **OS** | Windows 11 |
 | **WoW** | Running in **borderless windowed** mode. Exclusive fullscreen has no compositor surface to capture. |
 | **Resolution** | Up to 1440p on Ada, up to 2160p on Blackwell, is what the GPU matrix intends. Above that it still runs, and tells you it will cost more. |

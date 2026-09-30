@@ -31,6 +31,20 @@ is what the reader is looking for.
 
 ## Unreleased
 
+### Added
+
+- Experimental RTX 20 (Turing) and RTX 30 (Ampere) support. These cards can
+  launch the sidecar and attempt neural rendering with a matching runtime.
+  The manager reports an experimental warning; it does not claim the existing
+  Ada-patched runtime is compatible. GTX parts remain refused.
+- Turing automatically uses optical flow grid 4, including after a device
+  rebuild, instead of silently losing motion estimation with grid 1 or 2.
+- GPU policy, flow-grid and runtime compatibility regression tests, updated
+  Russian interface text, and a runtime preparation guide.
+
+RTX 20/30 hardware validation is pending. No patched NVIDIA binaries are shipped
+by this change.
+
 ## 0.2.0
 
 Three things that were broken or missing rather than merely unpolished, and the

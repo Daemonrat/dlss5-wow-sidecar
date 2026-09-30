@@ -250,16 +250,26 @@ const TranslationPair kRussianTable[] = {
 
     {"Graphics adapter", "Видеоадаптер"},
     {"No NVIDIA adapter found.", "Адаптер NVIDIA не найден."},
-    {"This sidecar needs an NVIDIA RTX 40 or RTX 50 card.",
-     "Программе нужна карта NVIDIA RTX 40 или RTX 50."},
-    {"RTX 40 (Ada) or RTX 50 (Blackwell) is required. Older cards are refused "
-     "rather than run badly.",
-     "Требуется RTX 40 (Ada) или RTX 50 (Blackwell). Более старым картам "
-     "отказано, вместо того чтобы работать плохо."},
+    {"This sidecar needs an NVIDIA RTX 20, 30, 40 or 50 card.",
+     "Программе нужна карта NVIDIA RTX 20, 30, 40 или 50."},
+    {"An NVIDIA RTX 20, 30, 40 or 50 card is required. "
+     "RTX 20/30 support is experimental.",
+     "Требуется карта NVIDIA RTX 20, 30, 40 или 50. "
+     "Поддержка RTX 20/30 экспериментальная."},
+    {"RTX 20/30 support is experimental. Supply nvngx_dlssnr.dll "
+     "with CUDA kernels for this GPU; otherwise the neural pass "
+     "falls back to passthrough.",
+     "Поддержка RTX 20/30 экспериментальная. Нужна сборка nvngx_dlssnr.dll "
+     "с ядрами CUDA для этой карты; иначе кадры выводятся без нейронной обработки."},
+    {"Neural rendering is experimental on ", "Нейронный рендеринг экспериментален на "},
+    {". This runtime has not been verified for this GPU. Supply a build "
+     "with matching CUDA kernels; the driver may reject it.",
+     ". Этот рантайм не проверен на данной карте. Нужна сборка с подходящими "
+     "ядрами CUDA; драйвер может её отклонить."},
     {"Display driver", "Драйвер дисплея"},
     {"No NVIDIA adapter to query.", "Нет адаптера NVIDIA для опроса."},
-    {"Install an NVIDIA RTX 40 or RTX 50 card.",
-     "Установите карту NVIDIA RTX 40 или RTX 50."},
+    {"Install an NVIDIA RTX 20, 30, 40 or 50 card.",
+     "Установите карту NVIDIA RTX 20, 30, 40 или 50."},
     {"User-mode driver ", "Драйвер пользовательского режима "},
     {"Could not read the driver version.", "Не удалось прочитать версию драйвера."},
     {"Not fatal. Update to a current NVIDIA driver if capture misbehaves.",
@@ -585,8 +595,8 @@ const TranslationPair kRussianTable[] = {
      "Exclusive fullscreen has no compositor surface to capture.",
      "World of Warcraft должен работать в оконном режиме без рамки.\n"
      "У эксклюзивного полноэкранного нет поверхности композитора для захвата."},
-    {"%hs is not supported. RTX 40 or RTX 50 required.",
-     "%hs не поддерживается. Требуется RTX 40 или RTX 50."},
+    {"%hs is not supported. An NVIDIA RTX 20, 30, 40 or 50 card is required.",
+     "%hs не поддерживается. Требуется карта NVIDIA RTX 20, 30, 40 или 50."},
     {"Failed to create the pipeline.", "Не удалось создать конвейер."},
     {"An overlay is already running.\n"
      "Stop it from the manager before starting another.",

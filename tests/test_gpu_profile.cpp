@@ -54,10 +54,8 @@ TEST_CASE("both axes stay even", "[unit]") {
   }
 }
 
-// An architecture outside the matrix has no ceiling, and the pass refuses to
-// run there anyway. Inventing a resolution policy for it would be inventing one
-// for a case that cannot occur.
-TEST_CASE("unsupported architectures pass the capture size through", "[unit]") {
+// No legacy resolution ceiling has been measured; preserve capture dimensions.
+TEST_CASE("architectures without a measured ceiling preserve the capture size", "[unit]") {
   const auto turing = InternalRenderSize(3840, 2160, GpuArch::Turing);
   CHECK(turing.width == 3840);
   CHECK(turing.height == 2160);
@@ -101,7 +99,7 @@ TEST_CASE("Ada device ids map to Ada", "[unit]") {
   REQUIRE(ArchitectureFromDeviceId(kNvidia, 0x2786) == GpuArch::Ada);  // RTX 4070
 }
 
-TEST_CASE("Ampere and Turing are recognised but not supported", "[unit]") {
+TEST_CASE("Ampere and Turing are recognised for experimental support", "[unit]") {
   REQUIRE(ArchitectureFromDeviceId(kNvidia, 0x2204) == GpuArch::Ampere);  // RTX 3090
   REQUIRE(ArchitectureFromDeviceId(kNvidia, 0x1E04) == GpuArch::Turing);  // RTX 2080 Ti
 }
@@ -129,4 +127,36 @@ TEST_CASE("default internal height follows the spec GPU matrix", "[unit]") {
   REQUIRE(DefaultInternalHeight(GpuArch::Ada) == 1440);
   REQUIRE(DefaultInternalHeight(GpuArch::Ampere) == 0);
   REQUIRE(DefaultInternalHeight(GpuArch::Unsupported) == 0);
+}
+
+TEST_CASE("sidecar accepts RTX generations and rejects non-RTX Turing", "[unit]") {
+  for (GpuArch arch : {GpuArch::Turing, GpuArch::Ampere, GpuArch::Ada, GpuArch::Blackwell}) {
+    GpuInfo gpu;
+    gpu.arch = arch;
+    gpu.vendorId = kNvidia;
+    gpu.name = L"NVIDIA GeForce RTX";
+    CHECK(CanRunSidecar(gpu));
+  }
+  GpuInfo gtx;
+  gtx.arch = GpuArch::Turing;
+  gtx.vendorId = kNvidia;
+  gtx.name = L"NVIDIA GeForce GTX 1660";
+  CHECK_FALSE(CanRunSidecar(gtx));
+  gtx.name = L"NVIDIA GeForce RTX";
+  gtx.vendorId = 0x1002;
+  CHECK_FALSE(CanRunSidecar(gtx));
+  CHECK_FALSE(IsSupportedGpu(GpuArch::Unsupported));
+  CHECK(IsExperimentalGpu(GpuArch::Turing));
+  CHECK(IsExperimentalGpu(GpuArch::Ampere));
+  CHECK_FALSE(IsExperimentalGpu(GpuArch::Ada));
+  CHECK_FALSE(IsExperimentalGpu(GpuArch::Blackwell));
+}
+
+TEST_CASE("Turing uses its hardware optical flow grid", "[unit]") {
+  for (uint32_t grid : {1u, 2u, 4u}) {
+    CHECK(CompatibleFlowGrid(GpuArch::Turing, grid) == 4);
+    for (GpuArch arch : {GpuArch::Ampere, GpuArch::Ada, GpuArch::Blackwell}) {
+      CHECK(CompatibleFlowGrid(arch, grid) == grid);
+    }
+  }
 }

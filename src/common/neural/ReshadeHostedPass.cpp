@@ -61,8 +61,13 @@ std::unique_ptr<ReshadeHostedPass> ReshadeHostedPass::Create(
   if (entry) {
     const std::string mismatch = DescribeCompatibility(options.arch, entry->variant);
     if (!mismatch.empty()) {
-      reason = mismatch;
-      return nullptr;
+      if (CheckRuntimeCompatibility(options.arch, entry->variant) ==
+          RuntimeCompatibility::UnverifiedArchitecture) {
+        GlobalLog().Warn(mismatch);
+      } else {
+        reason = mismatch;
+        return nullptr;
+      }
     }
   }
   // An unrecognised digest is not refused: the operator may legitimately have a

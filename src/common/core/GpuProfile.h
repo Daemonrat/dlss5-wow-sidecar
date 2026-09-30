@@ -8,6 +8,19 @@ namespace sidecar {
 
 enum class GpuArch { Unsupported, Turing, Ampere, Ada, Blackwell };
 
+constexpr bool IsExperimentalGpu(GpuArch arch) {
+  return arch == GpuArch::Turing || arch == GpuArch::Ampere;
+}
+
+constexpr bool IsSupportedGpu(GpuArch arch) {
+  return IsExperimentalGpu(arch) || arch == GpuArch::Ada ||
+         arch == GpuArch::Blackwell;
+}
+
+constexpr uint32_t CompatibleFlowGrid(GpuArch arch, uint32_t requested) {
+  return arch == GpuArch::Turing ? 4u : requested;
+}
+
 struct GpuInfo {
   GpuArch arch = GpuArch::Unsupported;
   std::wstring name;
@@ -15,6 +28,13 @@ struct GpuInfo {
   uint32_t vendorId = 0;
   uint32_t deviceId = 0;
 };
+
+// Turing device-id ranges also include GTX parts without Tensor Cores.
+inline bool CanRunSidecar(const GpuInfo& gpu) {
+  return gpu.vendorId == 0x10DE && IsSupportedGpu(gpu.arch) &&
+         (!IsExperimentalGpu(gpu.arch) ||
+          gpu.name.find(L"RTX") != std::wstring::npos);
+}
 
 // Pure. Device-id ranges are published per architecture; anything outside a
 // known range is reported Unsupported rather than guessed, because a wrong
@@ -48,7 +68,7 @@ struct VideoMemory {
 };
 std::optional<VideoMemory> QueryVideoMemory(LUID adapter);
 
-// Spec GPU matrix: 4K on Blackwell, 1440p on Ada, nothing else supported.
+// Measured resolution policy: 4K on Blackwell, 1440p on Ada; no legacy ceiling.
 uint32_t DefaultInternalHeight(GpuArch arch);
 
 struct RenderSize {

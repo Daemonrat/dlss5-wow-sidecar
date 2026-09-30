@@ -91,7 +91,7 @@ TEST_CASE("Each architecture asks for the variant it can run", "[unit]") {
   CHECK(VariantForArchitecture(GpuArch::Ada) == RuntimeVariant::AdaPatched);
 }
 
-TEST_CASE("Unsupported architectures ask for no runtime at all", "[unit]") {
+TEST_CASE("Architectures without a verified build ask for no runtime", "[unit]") {
   CHECK(VariantForArchitecture(GpuArch::Turing) == RuntimeVariant::None);
   CHECK(VariantForArchitecture(GpuArch::Ampere) == RuntimeVariant::None);
   CHECK(VariantForArchitecture(GpuArch::Unsupported) == RuntimeVariant::None);
@@ -131,7 +131,7 @@ TEST_CASE("A compatible pairing has nothing to say", "[unit]") {
 
 TEST_CASE("Cards outside the matrix are reported as such, not as wrong runtimes",
           "[unit]") {
-  for (GpuArch arch : {GpuArch::Turing, GpuArch::Ampere, GpuArch::Unsupported}) {
+  for (GpuArch arch : {GpuArch::Unsupported}) {
     CHECK(CheckRuntimeCompatibility(arch, RuntimeVariant::AdaPatched) ==
           RuntimeCompatibility::UnsupportedArchitecture);
     CHECK(DescribeCompatibility(arch, RuntimeVariant::AdaPatched).empty() == false);
@@ -142,4 +142,18 @@ TEST_CASE("Every variant has a name fit to show an operator", "[unit]") {
   CHECK(std::string(ToString(RuntimeVariant::Stock)).find("tock") != std::string::npos);
   CHECK(std::string(ToString(RuntimeVariant::AdaPatched)).find("da") != std::string::npos);
   CHECK(std::string(ToString(RuntimeVariant::None)).length() > 0);
+}
+
+TEST_CASE("RTX 20 and 30 runtime pairings are unverified rather than blocked", "[unit]") {
+  for (GpuArch arch : {GpuArch::Turing, GpuArch::Ampere}) {
+    for (RuntimeVariant variant : {RuntimeVariant::None, RuntimeVariant::Stock,
+                                   RuntimeVariant::AdaPatched}) {
+      CHECK(CheckRuntimeCompatibility(arch, variant) ==
+            RuntimeCompatibility::UnverifiedArchitecture);
+      const auto message = DescribeCompatibility(arch, variant);
+      CHECK(message.find("experimental") != std::string::npos);
+      CHECK(message.find(ToString(arch)) != std::string::npos);
+    }
+    CHECK(VariantForArchitecture(arch) == RuntimeVariant::None);
+  }
 }

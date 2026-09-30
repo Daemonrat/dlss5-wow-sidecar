@@ -107,15 +107,19 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
   }
   GlobalLog().Info(std::string("adapter: ") + ToString(gpu->arch));
 
-  if (gpu->arch != GpuArch::Ada && gpu->arch != GpuArch::Blackwell) {
+  if (!CanRunSidecar(*gpu)) {
     GlobalLog().Error(std::string(ToString(gpu->arch)) +
-                      " is not supported; RTX 40 or RTX 50 required");
+                      " is not supported; an NVIDIA RTX 20, 30, 40 or 50 card is required");
     wchar_t msg[256];
     swprintf_s(msg,
-               WideFromUtf8(Tr("%hs is not supported. RTX 40 or RTX 50 required.")).c_str(),
+               WideFromUtf8(Tr("%hs is not supported. An NVIDIA RTX 20, 30, 40 or 50 card is required.")).c_str(),
                ToString(gpu->arch));
     MessageBoxW(nullptr, msg, L"DLSS 5 Sidecar", MB_ICONERROR);
     return 1;
+  }
+
+  if (IsExperimentalGpu(gpu->arch)) {
+    GlobalLog().Warn("RTX 20/30 support is experimental; a matching neural runtime is required");
   }
 
   const Target target = ResolveTarget(argc, argv);

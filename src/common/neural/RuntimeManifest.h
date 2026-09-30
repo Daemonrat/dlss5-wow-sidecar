@@ -9,11 +9,8 @@ namespace sidecar {
 
 // Which build of nvngx_dlssnr.dll a machine needs.
 //
-// The stock signed NVIDIA runtime is the only one this project will ever name a
-// digest for. AdaPatched exists because the spec's GPU matrix says Ada needs a
-// different build, but that build is community-produced, user-supplied, and
-// never vendored or downloaded (I11) -- so the manifest recognises the shape of
-// the requirement without shipping the artefact.
+// The manifest recognises observed stock and Ada-patched builds. Experimental
+// Turing/Ampere builds remain user-supplied and unverified.
 enum class RuntimeVariant { None, Stock, AdaPatched };
 
 struct RuntimeEntry {
@@ -35,8 +32,7 @@ std::optional<RuntimeEntry> LookupRuntime(std::string_view sha256Hex);
 // because that is what makes a bug report actionable.
 std::string DescribeRuntime(std::string_view filePath, std::string_view sha256Hex);
 
-// Spec GPU matrix (see also DefaultInternalHeight, which encodes the resolution
-// half of the same table).
+// Verified runtime selections. None means no build is verified for this GPU.
 RuntimeVariant VariantForArchitecture(GpuArch arch);
 
 // Whether a runtime can actually run on an architecture.
@@ -49,6 +45,7 @@ RuntimeVariant VariantForArchitecture(GpuArch arch);
 // the pair up front turns a dead end into one sentence.
 enum class RuntimeCompatibility {
   Ok,
+  UnverifiedArchitecture,   // experimental RTX 20/30; requires matching kernels
   WrongVariant,             // a real runtime, but not one this card can run
   UnsupportedArchitecture,  // the card is outside the spec's matrix entirely
 };

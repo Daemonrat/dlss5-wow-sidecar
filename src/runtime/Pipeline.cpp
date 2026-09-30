@@ -103,6 +103,10 @@ std::unique_ptr<Pipeline> Pipeline::Create(const GpuInfo& gpu,
 
   std::unique_ptr<Pipeline> p(new Pipeline());
   p->config_ = config;
+  p->config_.flowGridSize = CompatibleFlowGrid(gpu.arch, config.flowGridSize);
+  if (p->config_.flowGridSize != config.flowGridSize) {
+    GlobalLog().Warn("Turing requires optical flow grid 4; overriding the configured grid");
+  }
   p->gpu_ = gpu;
   p->overlayVisible_.store(config.showOverlay, std::memory_order_release);
   p->hudVisible_.store(config.showHud, std::memory_order_release);
@@ -154,7 +158,7 @@ std::unique_ptr<Pipeline> Pipeline::Create(const GpuInfo& gpu,
   p->dev_.luminance = Luminance::Create(dev, w, h);
   p->dev_.previousLuma = Luminance::CreateR8Target(dev, w, h, D3D12_RESOURCE_STATE_COMMON);
   p->dev_.currentLuma = Luminance::CreateR8Target(dev, w, h, D3D12_RESOURCE_STATE_COMMON);
-  p->dev_.flow = NvofaFlow::Create(dev, p->dev_.bridge->Queue(), w, h, config.flowGridSize);
+  p->dev_.flow = NvofaFlow::Create(dev, p->dev_.bridge->Queue(), w, h, p->config_.flowGridSize);
   p->dev_.flowToMv = FlowToMotionVec::Create(dev, w, h);
   p->dev_.motionTarget = FlowToMotionVec::CreateMotionTarget(dev, w, h);
 
@@ -228,7 +232,7 @@ std::unique_ptr<Pipeline> Pipeline::Create(const GpuInfo& gpu,
   // as a quality problem months later.
   if (p->dev_.flow && p->dev_.flow->Available()) {
     GlobalLog().Info("optical flow available, grid size " +
-                     std::to_string(config.flowGridSize));
+                     std::to_string(p->config_.flowGridSize));
   } else {
     GlobalLog().Warn("optical flow unavailable; running on a zero motion field");
   }
