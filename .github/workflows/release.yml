@@ -1,4 +1,15 @@
-name: Release
+     - name: Use the patched RTX 20/30 runtime
+       shell: pwsh
+       run: |
+         $ErrorActionPreference = 'Stop'
+         $url = 'https://github.com/Daemonrat/dlss5-wow-sidecar/releases/download/runtime-rtx20-30/nvngx_dlssnr.dll'
+         $file = 'third-party-verified/nvngx_dlssnr.dll'
+         Invoke-WebRequest -Uri $url -OutFile $file
+         $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
+         if ($hash -ne 'c23d039f6eb1af1298ef6e8e43c251ef3dff31de3e734d6e30120737a444e719') {
+         throw 'Patched runtime SHA-256 mismatch'
+         }
+       name: Release
 
 # A tag makes a release. Nothing else does -- an ordinary push must not publish
 # anything, which is why this is a separate workflow from ci.yml rather than a
@@ -281,4 +292,4 @@ jobs:
 
           gh release create $env:TAG $env:ZIP SHA256SUMS.txt `
             --title "$env:TAG - DLSS 5 Sidecar" `
-            --notes-file $notes
+            --notes-file $notes --prerelease
