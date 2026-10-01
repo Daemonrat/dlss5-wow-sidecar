@@ -31,7 +31,11 @@ is what the reader is looking for.
 
 ## Unreleased
 
+## 0.3.0
+
 ### Added
+
+- Experimental RTX 20 (Turing) and RTX 30 (Ampere) support.
 
 - Experimental RTX 20 (Turing) and RTX 30 (Ampere) support. These cards can
   launch the sidecar and attempt neural rendering with a matching runtime.
