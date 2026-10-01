@@ -157,21 +157,37 @@ void DCompOverlay::Hide() noexcept {
   visible_ = false;
 }
 
-void DCompOverlay::Present(ID3D12Resource* frame, uint64_t waitFenceValue) {
+HRESULT DCompOverlay::Present(ID3D12Resource* frame, uint64_t waitFenceValue) {
   using Clock = std::chrono::steady_clock;
+  HRESULT hr = bridge_->D3d12()->GetDeviceRemovedReason();
+  if (FAILED(hr)) return hr;
+  // A previous failed wait must never be followed by an allocator reset.
+  if (presentFence_->GetCompletedValue() < presentFenceValue_) {
+    return DXGI_ERROR_WAIT_TIMEOUT;
+  }
+
   const auto beginWait = Clock::now();
-  if (frameLatencyWaitable_) WaitForSingleObjectEx(frameLatencyWaitable_, 1000, TRUE);
+  if (frameLatencyWaitable_) {
+    const DWORD waited = WaitForSingleObject(frameLatencyWaitable_, 1000);
+    if (waited == WAIT_TIMEOUT) return DXGI_ERROR_WAIT_TIMEOUT;
+    if (waited == WAIT_FAILED) return HRESULT_FROM_WIN32(GetLastError());
+    if (waited != WAIT_OBJECT_0) return E_FAIL;
+  }
   const auto afterWait = Clock::now();
 
   // Wait for the capture-side copy to complete before reading the frame.
-  bridge_->Queue()->Wait(bridge_->SharedFence(), waitFenceValue);
+  hr = bridge_->Queue()->Wait(bridge_->SharedFence(), waitFenceValue);
+  if (FAILED(hr)) return hr;
 
   const UINT backIndex = swapChain_->GetCurrentBackBufferIndex();
   ComPtr<ID3D12Resource> back;
-  if (FAILED(swapChain_->GetBuffer(backIndex, IID_PPV_ARGS(&back)))) return;
+  hr = swapChain_->GetBuffer(backIndex, IID_PPV_ARGS(&back));
+  if (FAILED(hr)) return hr;
 
-  alloc_->Reset();
-  cmdList_->Reset(alloc_.Get(), nullptr);
+  hr = alloc_->Reset();
+  if (FAILED(hr)) return hr;
+  hr = cmdList_->Reset(alloc_.Get(), nullptr);
+  if (FAILED(hr)) return hr;
 
   D3D12_RESOURCE_BARRIER toCopy{};
   toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -188,26 +204,47 @@ void DCompOverlay::Present(ID3D12Resource* frame, uint64_t waitFenceValue) {
   toPresent.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
   cmdList_->ResourceBarrier(1, &toPresent);
 
-  cmdList_->Close();
+  hr = cmdList_->Close();
+  if (FAILED(hr)) return hr;
   ID3D12CommandList* lists[] = {cmdList_.Get()};
   bridge_->Queue()->ExecuteCommandLists(1, lists);
 
-  swapChain_->Present(0, 0);   // pacing comes from the waitable object, not vsync
+  // Still fence submitted work if Present fails: a swapchain error does not
+  // mean the queue has finished reading the command allocators.
+  const HRESULT presented = swapChain_->Present(0, 0);
   const auto afterRecord = Clock::now();
 
-  bridge_->Queue()->Signal(presentFence_.Get(), ++presentFenceValue_);
+  hr = bridge_->Queue()->Signal(presentFence_.Get(), ++presentFenceValue_);
+  if (FAILED(hr)) return hr;
   if (presentFence_->GetCompletedValue() < presentFenceValue_) {
     HANDLE evt = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    presentFence_->SetEventOnCompletion(presentFenceValue_, evt);
-    WaitForSingleObject(evt, 1000);
+    if (!evt) return HRESULT_FROM_WIN32(GetLastError());
+    hr = presentFence_->SetEventOnCompletion(presentFenceValue_, evt);
+    if (FAILED(hr)) {
+      CloseHandle(evt);
+      return hr;
+    }
+    const DWORD waited = WaitForSingleObject(evt, 1000);
+    const DWORD waitError = waited == WAIT_FAILED ? GetLastError() : ERROR_SUCCESS;
     CloseHandle(evt);
+    hr = bridge_->D3d12()->GetDeviceRemovedReason();
+    if (FAILED(hr)) return hr;
+    if (waited == WAIT_TIMEOUT) return DXGI_ERROR_WAIT_TIMEOUT;
+    if (waited == WAIT_FAILED) return HRESULT_FROM_WIN32(waitError);
+    if (waited != WAIT_OBJECT_0 ||
+        presentFence_->GetCompletedValue() < presentFenceValue_) return E_FAIL;
   }
+  // Device removal can complete a fence with UINT64_MAX rather than signal a
+  // normal frame completion. Check the device before permitting another frame.
+  hr = bridge_->D3d12()->GetDeviceRemovedReason();
+  if (FAILED(hr)) return hr;
   const auto afterGpu = Clock::now();
 
   using Ms = std::chrono::duration<double, std::milli>;
   timing_.latencyWaitMs = Ms(afterWait - beginWait).count();
   timing_.recordMs = Ms(afterRecord - afterWait).count();
   timing_.gpuWaitMs = Ms(afterGpu - afterRecord).count();
+  return presented;
 }
 
 }  // namespace sidecar

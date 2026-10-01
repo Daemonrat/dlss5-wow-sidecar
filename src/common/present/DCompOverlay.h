@@ -44,7 +44,9 @@ class DCompOverlay {
 
   // Copies frame into the back buffer and presents. waitFenceValue is the
   // DeviceBridge shared-fence value the queue must wait on first.
-  void Present(ID3D12Resource* frame, uint64_t waitFenceValue);
+  // Success also guarantees GPU completion. On failure the caller must stop
+  // submitting frames, because its command allocators may still be in use.
+  HRESULT Present(ID3D12Resource* frame, uint64_t waitFenceValue);
 
   // Where the last Present's wall time went. Three numbers, because they have
   // three different causes and three different fixes: waiting on the

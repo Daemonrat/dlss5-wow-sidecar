@@ -33,6 +33,12 @@ is what the reader is looking for.
 
 ### Fixed
 
+- Stop and hide the overlay when presentation or GPU completion fails, rather
+  than reusing command allocators after an ignored fence timeout. Errors now
+  include the presentation HRESULT and device removal reason. This prevents an
+  unsafe retry; RTX 30 neural performance and driver hangs remain under investigation.
+- Update status by elapsed time and log frame budgets every three seconds, so
+  slow runs produce diagnostics before reaching hundreds of rendered frames.
 - Release packages now use the upstream E67DEE neural runtime. A user reported
   that replacing v0.3.2's custom C23D039 runtime with this build resolved scan
   lines and rainbow textures on an RTX 3060. Low frame rates remain a separate

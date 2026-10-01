@@ -76,3 +76,93 @@ jobs:
       - name: Re-check binaries against the safety invariants
         run: |
           python ci/check_imports.py build\Debug\wowsidecar.exe build\Debug\wowsidecar-manager.exe build\Debug\testpattern.exe
+
+  # A downloadable SDK-enabled build for testing fixes without making a release.
+  # Keep secrets restricted to main pushes and explicit dispatches.
+  diagnostic-build:
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    env:
+      DLSS_SDK_COMMIT: a291cc7d2cc642a51566f3dfd5376f635cd1b284
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install binary checker
+        run: python -m pip install --disable-pip-version-check pefile
+      - name: Fetch the NVIDIA DLSS SDK
+        shell: pwsh
+        run: |
+          git clone --filter=blob:none --sparse --no-checkout https://github.com/NVIDIA/DLSS sdk-dlss
+          cd sdk-dlss
+          git sparse-checkout set include lib/Windows_x86_64/x64
+          git checkout --quiet $env:DLSS_SDK_COMMIT
+          if (-not (Test-Path lib/Windows_x86_64/x64/nvsdk_ngx_d.lib)) {
+            Write-Error "The DLSS SDK checkout has no nvsdk_ngx_d.lib; the layout has changed."
+            exit 1
+          }
+
+      - name: Fetch the NVIDIA Optical Flow SDK
+        shell: pwsh
+        env:
+          NVOF_SDK_B64: ${{ secrets.NVOF_SDK_B64 }}
+          NVOF_SDK_URL: ${{ secrets.NVOF_SDK_URL }}
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          if ($env:NVOF_SDK_B64) {
+            [IO.File]::WriteAllBytes("nvof.zip", [Convert]::FromBase64String($env:NVOF_SDK_B64))
+            Write-Output "Optical Flow SDK taken from NVOF_SDK_B64."
+          } elseif ($env:NVOF_SDK_URL) {
+            Invoke-WebRequest -Uri $env:NVOF_SDK_URL -OutFile nvof.zip
+            Write-Output "Optical Flow SDK taken from NVOF_SDK_URL."
+          } else {
+            Write-Error @"
+          Neither NVOF_SDK_B64 nor NVOF_SDK_URL is set.
+
+          One of them has to supply NvOFInterface/ from the NVIDIA Optical Flow
+          SDK. NVIDIA publishes only the CUDA headers on GitHub; the D3D12 header
+          this project includes comes with the download behind a developer
+          account, so it cannot be fetched here without one.
+
+          To set the preferred form, from a checkout that has the SDK:
+            Compress-Archive third_party/Optical-Flow-SDK/NvOFInterface nvof.zip
+            gh secret set NVOF_SDK_B64 --body ([Convert]::ToBase64String([IO.File]::ReadAllBytes('nvof.zip')))
+
+          This job refuses to continue rather than publish a build without it. A
+          sidecar built with no Optical Flow SDK starts, reports a neural pass,
+          and never runs one -- there is no motion field, so every frame is
+          copied through untouched and nothing on screen says so.
+          "@
+            exit 1
+          }
+          Expand-Archive -Path nvof.zip -DestinationPath sdk-nvof -Force
+          $interface = Get-ChildItem -Path sdk-nvof -Recurse -Directory -Filter NvOFInterface | Select-Object -First 1
+          if (-not $interface) { Write-Error "The archive has no NvOFInterface directory."; exit 1 }
+          if (-not (Test-Path (Join-Path $interface.FullName 'nvOpticalFlowD3D12.h'))) {
+            Write-Error "NvOFInterface has no nvOpticalFlowD3D12.h; this is the CUDA-only copy."
+            exit 1
+          }
+          "NVOF_ROOT=$($interface.Parent.FullName)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+
+      - name: Configure with both NVIDIA SDKs
+        run: >
+          cmake -S . -B diagnostic-build -A x64
+          -DSIDECAR_REQUIRE_SDKS=ON
+          -DDLSS_SDK_DIR=${{ github.workspace }}/sdk-dlss
+          -DNVOF_SDK_DIR=${{ env.NVOF_ROOT }}
+      - name: Build diagnostic executables
+        run: cmake --build diagnostic-build --config Release --target wowsidecar wowsidecar-manager sidecar_tests
+      - name: Test SDK-enabled build
+        run: diagnostic-build\tests\Release\sidecar_tests.exe "[unit]"
+      - name: Upload replacement executables
+        uses: actions/upload-artifact@v4
+        with:
+          name: wowsidecar-diagnostic-${{ github.sha }}
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            diagnostic-build/Release/wowsidecar.exe
+            diagnostic-build/Release/wowsidecar-manager.exe
+

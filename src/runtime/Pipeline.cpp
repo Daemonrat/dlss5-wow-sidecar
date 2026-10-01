@@ -468,8 +468,8 @@ void Pipeline::RenderLoop() {
   // on whichever thread called Start().
   panic_ = PanicSwitch::Create([this] { Panic(); });
 
-  uint64_t sinceHudUpdate = 0;
-  uint64_t hudUpdates = 0;
+  auto nextHudUpdate = Clock::now();
+  auto nextDiagnostics = nextHudUpdate;
   // Accumulated across the reporting window rather than sampled, because the
   // interesting question is where the frame budget goes on average, not what
   // one arbitrary frame did.
@@ -708,7 +708,21 @@ void Pipeline::RenderLoop() {
     dev_.bridge->Queue()->ExecuteCommandLists(1, lists);
     const auto afterRecord = Clock::now();
 
-    dev_.overlay->Present(dev_.workTarget.Get(), frame->fenceValue);
+    const HRESULT presented =
+        dev_.overlay->Present(dev_.workTarget.Get(), frame->fenceValue);
+    if (FAILED(presented)) {
+      const HRESULT removed = dev_.bridge->D3d12()->GetDeviceRemovedReason();
+      char message[192];
+      std::snprintf(message, sizeof(message),
+                    "presentation stopped: HRESULT 0x%08lX, device reason 0x%08lX; "
+                    "GPU completion could not be confirmed",
+                    static_cast<unsigned long>(presented),
+                    static_cast<unsigned long>(removed));
+      FailAndHide(message);
+      // Do not reset either phase's allocator after a failed completion wait.
+      // Leave the overlay hidden rather than retrying the same stalled work.
+      break;
+    }
     recordMs += std::chrono::duration<double, std::milli>(afterRecord - begin).count();
     {
       const auto present = dev_.overlay->LastTiming();
@@ -730,8 +744,8 @@ void Pipeline::RenderLoop() {
     // Refresh roughly twice a second rather than every frame. Not gated on the
     // HUD existing: the manager's status pane rides the same cadence, and a
     // failed HUD must not take the live numbers down with it.
-    if (++sinceHudUpdate >= 30) {
-      sinceHudUpdate = 0;
+    if (Clock::now() >= nextHudUpdate) {
+      nextHudUpdate = Clock::now() + std::chrono::milliseconds(500);
 
       HudModel model;
       model.p50Ms = stats_.P50();
@@ -772,11 +786,12 @@ void Pipeline::RenderLoop() {
       budget.gpuWaitMs = gpuWaitMs / perFrame;
       PublishStatus(model, budget);
 
-      // Periodically to the log as well, roughly every ten seconds. The HUD is
+      // Periodically to the log as well, roughly every three seconds. The HUD is
       // the operator's view, but a bug report needs numbers that survive being
       // pasted into a text box -- and it is the only way to read latency from a
       // headless run.
-      if (++hudUpdates % 20 == 0) {
+      if (now >= nextDiagnostics) {
+        nextDiagnostics = now + std::chrono::seconds(3);
         GlobalLog().Info("latency p50 " + FormatMs(stats_.P50()) + " ms, p99 " +
                          FormatMs(stats_.P99()) + " ms over " +
                          std::to_string(stats_.Count()) + " frames, " +
