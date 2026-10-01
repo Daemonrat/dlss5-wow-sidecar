@@ -31,6 +31,13 @@ is what the reader is looking for.
 
 ## Unreleased
 
+### Fixed
+
+- Release packages now use the upstream E67DEE neural runtime. A user reported
+  that replacing v0.3.2's custom C23D039 runtime with this build resolved scan
+  lines and rainbow textures on an RTX 3060. Low frame rates remain a separate
+  issue; RTX 20/30 support remains experimental.
+
 ## 0.3.2
 
 ### Added

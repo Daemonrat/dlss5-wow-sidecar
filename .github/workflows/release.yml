@@ -22,7 +22,7 @@ env:
   # different binaries on two different days.
   DLSS_SDK_COMMIT: a291cc7d2cc642a51566f3dfd5376f635cd1b284
 
-  # Where the three unchanged third-party binaries come from. They are never in the tree
+  # Where the four third-party binaries come from. They are never in the tree
   # (I11), and the software never downloads anything -- this job does, once,
   # from the archive the upstream author published, and checks every file
   # against the digests pinned below before it goes anywhere near the bundle.
@@ -172,13 +172,14 @@ jobs:
       - name: Re-check the binaries against the safety invariants
         run: python ci/check_imports.py build\Release\wowsidecar.exe build\Release\wowsidecar-manager.exe
 
-      # Verify the unchanged upscaling runtime, ReShade and RenoDX from upstream.
-      # The neural runtime is fetched separately from this fork's runtime release.
+      # Verify all four upstream binaries, including the E67DEE neural runtime.
+      # A user reported clean output with this runtime on an RTX 3060.
       - name: Fetch the third-party binaries and check them
         shell: pwsh
         run: |
           $ProgressPreference = 'SilentlyContinue'
           $expected = [ordered]@{
+            'nvngx_dlssnr.dll'     = 'e67dee209320cdafe0e93e45675d7aa34323a53acc57a72b2e40a181581c989a'
             'nvngx_dlss.dll'       = 'c85f971ce023c9f3492fc7455f0b01a24ba18ea39636407a846902c4360b0b7e'
             'dxgi.dll'             = '0cee63f9c9f13f3ac909c5b4903f4dbb4b719a7ab3b4f13b0deaf83c814b94f7'
             'renodx-dlss5.addon64' = 'e1c28fde0922b12fc10734e58c3d24a36808e575247f4fd4f36226540d7ee023'
@@ -205,20 +206,6 @@ jobs:
             Write-Output "$name  $hash  ok"
           }
           if ($failed) { exit 1 }
-
-      - name: Use the patched RTX 20/30 runtime
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $ProgressPreference = 'SilentlyContinue'
-          $url = 'https://github.com/Daemonrat/dlss5-wow-sidecar/releases/download/runtime-rtx20-30/nvngx_dlssnr.dll'
-          $file = 'third-party-verified/nvngx_dlssnr.dll'
-          Invoke-WebRequest -Uri $url -OutFile $file
-          $hash = (Get-FileHash $file -Algorithm SHA256).Hash.ToLower()
-          if ($hash -ne 'c23d039f6eb1af1298ef6e8e43c251ef3dff31de3e734d6e30120737a444e719') {
-            throw 'Patched runtime SHA-256 mismatch'
-          }
-          Write-Output "nvngx_dlssnr.dll  $hash  ok"
 
       - name: Package
         shell: pwsh
@@ -266,21 +253,23 @@ jobs:
           Both executables, built from this tag with both NVIDIA SDKs present
           (the job refuses to run without them, because a build missing either
           one reports a neural pass and never runs one); the DLSS 5 neural
-          rendering runtime (user-patched for experimental RTX 20/30 support);
-          hardware validation of this runtime is pending. Also included: the DLSS
+          rendering runtime (upstream E67DEE compatibility build, reported to
+          render correctly on an RTX 3060). Also included: the DLSS
           upscaling runtime; ReShade 6.8 with add-on support; the RenoDX DLSS 5
           add-on; and a ``sidecar.toml`` set to the Recommended preset.
 
-          The neural runtime comes from this fork's runtime-rtx20-30 release.
-          The other three third-party binaries match the upstream 0.1.2 release.
+          All four third-party binaries match the upstream 0.1.2 release.
           All four are verified by SHA-256 before packaging.
           They belong to their authors and
           are covered by their own terms, not this project's MIT licence -- see
           ``THIRD-PARTY-NOTICES.md`` in the archive.
 
-          RTX 20/30 support is experimental; hardware validation is pending.
+          RTX 20/30 support remains experimental. Clean rendering has been
+          reported on an RTX 3060; Turing validation remains pending.
           Windows 11 and WoW in borderless windowed mode are required.
-          This patched runtime has not been verified on RTX 40/50 either.
+          The custom C23D039 runtime previously bundled with v0.3.2 produced
+          severe visual artifacts on the RTX 3060 and is no longer bundled.
+          Low frame rates remain possible on older GPUs.
           Read *About frame rate* in the README before judging performance.
 
           ``SHA256SUMS.txt`` covers the archive and every file inside it.
