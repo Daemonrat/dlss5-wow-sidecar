@@ -31,8 +31,17 @@ is what the reader is looking for.
 
 ## Unreleased
 
+### Added
+
+- Ctrl+Alt+F8 toggles the overlay and HUD while pausing neural processing. The
+  shortcut is handled independently of the render thread's GPU waits. Capture
+  and GPU allocations remain alive for quick resume; game FPS limits are unchanged.
+
 ### Fixed
 
+- Alt-Tab and minimizing WoW hide the overlay and HUD and pause processing.
+  Returning to WoW resumes only if the overlay is enabled. Resuming resets
+  temporal history; a failed render loop cannot be shown again by the toggle.
 - Stop and hide the overlay when presentation or GPU completion fails, rather
   than reusing command allocators after an ignored fence timeout. Errors now
   include the presentation HRESULT and device removal reason. This prevents an

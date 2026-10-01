@@ -209,12 +209,34 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     channel->Publish(status);
   });
 
+  constexpr int kToggleHotkey = 0xB00D;
+  const bool hotkeyRegistered = RegisterHotKey(
+      nullptr, kToggleHotkey, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_F8) != 0;
+  if (hotkeyRegistered) GlobalLog().Info("Ctrl+Alt+F8 toggles the overlay and neural processing");
+  else GlobalLog().Warn("Ctrl+Alt+F8 is unavailable; another application may own this hotkey");
+
+  // This timer belongs to the UI thread, so Alt-Tab still uncovers the desktop
+  // while the render thread is waiting for a slow GPU frame.
+  const UINT_PTR foregroundTimer = SetTimer(nullptr, 0, 100, nullptr);
+  if (!foregroundTimer) {
+    if (hotkeyRegistered) UnregisterHotKey(nullptr, kToggleHotkey);
+    GlobalLog().Error("could not start foreground monitoring; overlay not started");
+    return 1;
+  }
+  pipeline->SetTargetForeground(false);
   pipeline->Start();
   GlobalLog().Info("overlay running");
   GiveTargetTheForeground(target.hwnd);
+  pipeline->SetTargetForeground(IsForegroundTarget(target.hwnd, GetForegroundWindow()));
 
   MSG msg{};
-  while (GetMessageW(&msg, nullptr, 0, 0)) {
+  while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    pipeline->SetTargetForeground(IsForegroundTarget(target.hwnd, GetForegroundWindow()));
+    if (msg.message == WM_HOTKEY && !msg.hwnd && msg.wParam == kToggleHotkey) {
+      pipeline->SetOverlayVisible(!pipeline->OverlayVisible());
+      GlobalLog().Info(pipeline->OverlayVisible() ? "overlay enabled by hotkey"
+                                                : "overlay disabled by hotkey");
+    }
     TranslateMessage(&msg);
     DispatchMessageW(&msg);
 
@@ -238,6 +260,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
       break;
     }
   }
+  KillTimer(nullptr, foregroundTimer);
+  if (hotkeyRegistered) UnregisterHotKey(nullptr, kToggleHotkey);
   pipeline->Stop();
   return 0;
 }

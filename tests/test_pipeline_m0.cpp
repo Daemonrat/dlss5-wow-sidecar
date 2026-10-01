@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <windows.h>
 #include <chrono>
+#include <atomic>
 #include <memory>
 #include <thread>
 
@@ -52,6 +53,57 @@ void PumpFor(std::chrono::milliseconds duration) {
 }
 
 }  // namespace
+
+TEST_CASE("background pause preserves manual off and resumes processing", "[device]") {
+  struct CountingPass : INeuralPass {
+    std::atomic<unsigned> frames{0}, resets{0};
+    std::unique_ptr<INeuralPass> copy = PassthroughPass::Create();
+    bool Evaluate(ID3D12GraphicsCommandList* cl, ID3D12Resource* color,
+                  ID3D12Resource* motion, ID3D12Resource* depth,
+                  ID3D12Resource* out) override {
+      ++frames;
+      return copy->Evaluate(cl, color, motion, depth, out);
+    }
+    void ResetHistory() override { ++resets; }
+    const char* Name() const override { return "counting passthrough"; }
+  };
+  auto gpu = DetectPrimaryGpu();
+  REQUIRE(gpu.has_value());
+  PatternApp app;
+  REQUIRE(app.Launch());
+  PipelineConfig cfg;
+  cfg.target = app.hwnd;
+  auto pass = std::make_unique<CountingPass>();
+  auto* counter = pass.get();
+  auto pipeline = Pipeline::Create(*gpu, cfg, std::move(pass));
+  REQUIRE(pipeline);
+  pipeline->Start();
+  PumpFor(1500ms);
+  REQUIRE(counter->frames.load() > 0);
+  pipeline->SetTargetForeground(false);
+  PumpFor(300ms);
+  CHECK_FALSE(IsWindowVisible(pipeline->OverlayHwnd()));
+  if (pipeline->GetHud()) CHECK_FALSE(IsWindowVisible(pipeline->GetHud()->Hwnd()));
+  const auto pausedFrames = counter->frames.load();
+  PumpFor(300ms);
+  CHECK(counter->frames.load() == pausedFrames);
+  pipeline->SetOverlayVisible(false);
+  pipeline->SetTargetForeground(true);
+  PumpFor(300ms);
+  CHECK_FALSE(IsWindowVisible(pipeline->OverlayHwnd()));
+  CHECK(counter->frames.load() == pausedFrames);
+  pipeline->SetOverlayVisible(true);
+  PumpFor(1000ms);
+  CHECK(IsWindowVisible(pipeline->OverlayHwnd()));
+  CHECK(counter->frames.load() > pausedFrames);
+  CHECK(counter->resets.load() > 0);
+  pipeline->Panic();
+  PumpFor(100ms);
+  pipeline->SetOverlayVisible(true);
+  pipeline->SetTargetForeground(true);
+  CHECK_FALSE(IsWindowVisible(pipeline->OverlayHwnd()));
+  pipeline->Stop();
+}
 
 TEST_CASE("pipeline runs end to end over the test pattern", "[device]") {
   auto gpu = DetectPrimaryGpu();

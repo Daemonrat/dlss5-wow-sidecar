@@ -1221,6 +1221,8 @@ int WINAPI wWinMain(HINSTANCE inst, HINSTANCE, PWSTR, int show) {
 
       ImGui::Dummy(ImVec2(0.0f, S(20.0f)));
       SectionHeading("Playing with the overlay up");
+      Hint("Ctrl+Alt+F8 toggles the overlay and pauses neural processing. "
+           "Alt-Tab hides it automatically; returning to WoW resumes it unless switched off.");
       Hint("The overlay covers the game completely and passes every click "
            "straight through to it, so play normally. It never takes focus, so "
            "whatever had the keyboard keeps it -- if the game is not responding, "

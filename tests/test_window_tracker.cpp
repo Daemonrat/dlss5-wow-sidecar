@@ -90,6 +90,25 @@ TEST_CASE("a titlebar window does not read as borderless", "[unit]") {
   DestroyWindow(hwnd);
 }
 
+TEST_CASE("foreground gating rejects other, hidden and minimized windows", "[unit]") {
+  HWND target = MakeWindow(WS_POPUP);
+  HWND other = MakeWindow(WS_POPUP);
+  REQUIRE(target != nullptr);
+  REQUIRE(other != nullptr);
+  CHECK(IsForegroundTarget(target, target));
+  CHECK_FALSE(IsForegroundTarget(target, other));
+  CHECK_FALSE(IsForegroundTarget(target, nullptr));
+  CHECK_FALSE(IsForegroundTarget(nullptr, nullptr));
+  ShowWindow(target, SW_HIDE);
+  CHECK_FALSE(IsForegroundTarget(target, target));
+  ShowWindow(target, SW_SHOWMINNOACTIVE);
+  CHECK_FALSE(IsForegroundTarget(target, target));
+  ShowWindow(target, SW_SHOWNOACTIVATE);
+  DestroyWindow(target);
+  CHECK_FALSE(IsForegroundTarget(target, target));
+  DestroyWindow(other);
+}
+
 TEST_CASE("client rect is reported in screen coordinates", "[unit]") {
   HWND hwnd = MakeWindow(WS_POPUP);
   auto rect = ClientRectInScreen(hwnd);

@@ -13,6 +13,8 @@ class INeuralPass {
  public:
   virtual ~INeuralPass() = default;
 
+  virtual void ResetHistory() {}
+
   virtual bool Evaluate(ID3D12GraphicsCommandList* cl,
                         ID3D12Resource* color,
                         ID3D12Resource* motion,

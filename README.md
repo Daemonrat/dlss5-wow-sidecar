@@ -136,6 +136,16 @@ or replaced file is a named problem with a remedy rather than a silent failure.
 click straight through to it and never takes focus. If the keyboard stops
 reaching the game, alt-tab to WoW once.
 
+**Ctrl+Alt+F8** toggles the overlay and HUD off and back on. While off, neural
+processing pauses; capture and allocated GPU resources remain available for a
+quick resume. The game's own FPS cap stays as you set it.
+
+**Alt-Tab works normally:** the overlay and HUD hide and processing pauses when
+WoW loses focus or is minimized. Returning to WoW resumes them unless you
+switched the overlay off. The toggle runs on the window thread, independently
+of GPU waits. If another app owns Ctrl+Alt+F8, the log reports the conflict;
+automatic hiding and the manager's Show/Hide controls still work.
+
 **Ctrl+Alt+Backspace** takes the overlay down from anywhere, without needing the
 manager window — it is a panic switch, and it works even if the manager is gone.
 

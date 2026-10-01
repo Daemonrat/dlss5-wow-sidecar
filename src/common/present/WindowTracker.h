@@ -51,6 +51,8 @@ bool IsBorderless(HWND hwnd);
 
 std::optional<RECT> ClientRectInScreen(HWND hwnd);
 
+bool IsForegroundTarget(HWND target, HWND foreground);
+
 // Follows a window through moves and resizes.
 //
 // The hook is installed WINEVENT_OUTOFCONTEXT. The in-context form maps a DLL
