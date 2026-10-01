@@ -21,6 +21,10 @@ bool IsBorderless(HWND hwnd) {
   return (style & WS_CAPTION) == 0 && (style & WS_THICKFRAME) == 0;
 }
 
+bool IsForegroundTarget(HWND target, HWND foreground) {
+  return target && target == foreground && IsWindowVisible(target) && !IsIconic(target);
+}
+
 std::optional<RECT> ClientRectInScreen(HWND hwnd) {
   if (!hwnd || !IsWindow(hwnd)) return std::nullopt;
   RECT client{};

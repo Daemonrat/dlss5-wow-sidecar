@@ -296,7 +296,7 @@ bool ReshadeHostedPass::Evaluate(ID3D12GraphicsCommandList* cl,
   eval.motionScaleX = static_cast<float>(width_);
   eval.motionScaleY = static_cast<float>(height_);
   eval.reset = justCreated_;
-  justCreated_ = false;
+  if (motion) justCreated_ = false;
 
   // More than one pass needs somewhere for the middle of the run to live: a
   // neural evaluate cannot read and write the same texture. The scratch is a

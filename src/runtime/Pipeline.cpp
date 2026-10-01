@@ -261,6 +261,7 @@ std::string Pipeline::LastError() const {
 }
 
 void Pipeline::FailAndHide(const char* reason) {
+  failed_.store(true, std::memory_order_release);
   // Spec failure rule: hide first, then record. Never leave an opaque overlay
   // over a live game.
   if (dev_.overlay) dev_.overlay->Hide();
@@ -303,21 +304,31 @@ void Pipeline::PublishStatus(const HudModel& model, const FrameBudget& budget) {
 
 void Pipeline::SetOverlayVisible(bool visible) {
   overlayVisible_.store(visible, std::memory_order_release);
-  if (!dev_.overlay) return;
-  if (visible) {
-    dev_.overlay->Show();
-  } else {
-    dev_.overlay->Hide();
-  }
+  UpdateVisibility();
 }
 
 void Pipeline::SetHudVisible(bool visible) {
   hudVisible_.store(visible, std::memory_order_release);
-  if (!dev_.hud) return;
-  if (visible) {
-    dev_.hud->Show();
-  } else {
-    dev_.hud->Hide();
+  UpdateVisibility();
+}
+
+void Pipeline::SetTargetForeground(bool foreground) {
+  targetForeground_.store(foreground, std::memory_order_release);
+  UpdateVisibility();
+}
+
+void Pipeline::UpdateVisibility() {
+  const bool visible = Running() && !failed_.load(std::memory_order_acquire) &&
+      !stopRequested_.load(std::memory_order_acquire) && OverlayVisible() &&
+      targetForeground_.load(std::memory_order_acquire);
+  if (dev_.overlay && !!IsWindowVisible(dev_.overlay->Hwnd()) != visible) {
+    if (visible) dev_.overlay->Show();
+    else dev_.overlay->Hide();
+  }
+  const bool hud = visible && HudVisible();
+  if (dev_.hud && !!IsWindowVisible(dev_.hud->Hwnd()) != hud) {
+    if (hud) dev_.hud->Show();
+    else dev_.hud->Hide();
   }
 }
 
@@ -396,6 +407,7 @@ bool Pipeline::RebuildAndRestart() {
     return false;
   }
   rebuildRequested_.store(false, std::memory_order_release);
+  failed_.store(false, std::memory_order_release);
   {
     std::lock_guard<std::mutex> lock(errorMutex_);
     lastError_.clear();
@@ -480,6 +492,7 @@ void Pipeline::RenderLoop() {
   uint64_t framesThisWindow = 0;
   uint64_t deliveredAtWindowStart = dev_.source ? dev_.source->FramesDelivered() : 0;
   auto windowBegan = Clock::now();
+  bool paused = false;
   while (!stopRequested_.load(std::memory_order_acquire)) {
     if (panic_) panic_->Pump();
     if (panic_ && panic_->Triggered()) break;
@@ -505,6 +518,32 @@ void Pipeline::RenderLoop() {
       targetLost_.store(true, std::memory_order_release);
       if (ownerThreadId_ != 0) PostThreadMessageW(ownerThreadId_, WM_NULL, 0, 0);
       break;
+    }
+
+    if (!OverlayVisible() || !targetForeground_.load(std::memory_order_acquire)) {
+      if (!paused) GlobalLog().Info("overlay paused; neural processing suspended");
+      paused = true;
+      if (Clock::now() >= nextHudUpdate) {
+        HudModel model;
+        model.passName = "paused";
+        model.runtimeVariant = dev_.runtimeVariant;
+        model.gpuName = dev_.gpuName.c_str();
+        PublishStatus(model, FrameBudget{});
+        nextHudUpdate = Clock::now() + std::chrono::milliseconds(500);
+      }
+      Sleep(20);
+      continue;
+    }
+    if (paused) {
+      dev_.havePreviousFrame = false;
+      dev_.pass->ResetHistory();
+      idleMs = recordMs = presentWaitMs = gpuWaitMs = 0.0;
+      framesThisWindow = 0;
+      deliveredAtWindowStart = dev_.source->FramesDelivered();
+      windowBegan = Clock::now();
+      nextHudUpdate = nextDiagnostics = windowBegan + std::chrono::milliseconds(500);
+      paused = false;
+      GlobalLog().Info("overlay resumed; temporal history reset");
     }
 
     // Time spent here is time the pipeline had no work: the capture has not

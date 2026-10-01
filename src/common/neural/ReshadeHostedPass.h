@@ -83,6 +83,8 @@ class ReshadeHostedPass : public INeuralPass {
 
   const char* Name() const override { return "reshade-hosted DLSS 5 NR"; }
 
+  void ResetHistory() override { justCreated_ = true; }
+
   // Which runtime build is live, for the HUD and the log. Never ambiguous:
   // two builds share a version string and a byte count, so only the digest
   // separates them.

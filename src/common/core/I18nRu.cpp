@@ -20,6 +20,10 @@
 namespace sidecar {
 
 const TranslationPair kRussianTable[] = {
+    {"Ctrl+Alt+F8 toggles the overlay and pauses neural processing. "
+     "Alt-Tab hides it automatically; returning to WoW resumes it unless switched off.",
+     "Ctrl+Alt+F8 переключает оверлей и приостанавливает нейрообработку. "
+     "Alt-Tab скрывает его автоматически; при возврате в WoW он возобновится, если не выключен вручную."},
     // ---------------------------------------------------------------- shell
     {"Status", "Состояние"},
     {"Setup", "Установка"},

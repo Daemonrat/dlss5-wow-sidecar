@@ -83,11 +83,11 @@ class Pipeline {
   const Hud* GetHud() const { return dev_.hud.get(); }
   std::string LastError() const;
 
-  // Show and hide either window without stopping capture, which is what makes
-  // an A/B comparison against the untouched game one keystroke rather than one
-  // restart. Call from the thread that called Start(): these move windows.
+  // Hiding the overlay also pauses processing. Capture stays alive for a quick
+  // resume. Call these from the window-owning thread.
   void SetOverlayVisible(bool visible);
   void SetHudVisible(bool visible);
+  void SetTargetForeground(bool foreground);
   bool OverlayVisible() const { return overlayVisible_.load(std::memory_order_acquire); }
   bool HudVisible() const { return hudVisible_.load(std::memory_order_acquire); }
 
@@ -132,6 +132,7 @@ class Pipeline {
   Pipeline() = default;
   void RenderLoop();
   void FailAndHide(const char* reason);
+  void UpdateVisibility();
 
   // One reporting window's worth of "where did the frame go", averaged per
   // frame. Assembled by the render loop, which is the only place that can see
@@ -225,6 +226,8 @@ class Pipeline {
   std::atomic<bool> stopRequested_{false};
   std::atomic<bool> rebuildRequested_{false};
   std::atomic<bool> targetLost_{false};
+  std::atomic<bool> targetForeground_{true};
+  std::atomic<bool> failed_{false};
   // True when dev_.pass was built from config_ rather than handed in, and so
   // must be rebuilt against a new device rather than carried across one.
   bool passFromConfig_ = false;
