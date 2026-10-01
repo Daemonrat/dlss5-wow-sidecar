@@ -4,7 +4,7 @@
 
 # DLSS 5 Sidecar for World of Warcraft
 
-Current Build is Corrupt, still working on a fix.
+Potential fix in place, untested!!
 
 > **RTX 20/30 experimental fork:** Turing and Ampere can start the sidecar and
 > attempt neural rendering. Supply a `nvngx_dlssnr.dll` with CUDA kernels for
